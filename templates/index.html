@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hand Gesture Calculator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            --section-width: 550px;
+            --section-minheight: 650px;
+        }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #20232a;
+            color: #fff;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+        .main-flex {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: stretch;   /* stretch both columns to equal height */
+    gap: 36px;
+    margin: 36px auto;
+    max-width: 1200px;
+    flex-wrap: wrap;
+}
+.section {
+    background: #2b2d35;
+    border-radius: 14px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.28);
+    padding: 27px 21px;
+    width: 550px;                  /* or use flex-basis: 550px; */
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;                   /* allow both sections to expand equally */
+}
+
+        .section h2 {
+            margin-bottom: 18px;
+            text-align: center;
+        }
+        .video-section img {
+            display: block;
+            width: 100%;
+            max-width: 440px;
+            height: 440px;
+            border-radius: 10px;
+            background: #222;
+            margin: 0 auto;
+            box-shadow: 0 0 8px #000c;
+        }
+        .calc-display {
+            background: #111;
+            border-radius: 12px;
+            padding: 36px 25px 36px 32px;
+            font-size: 3.1em;
+            color: #0ff7e5;
+            letter-spacing: 2px;
+            margin-bottom: 24px;
+            min-height: 68px;
+            box-sizing: border-box;
+            text-align: right;
+            word-break: break-all;
+        }
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 98px);
+            gap: 16px;
+            justify-content: center;
+            margin-bottom: 18px;
+        }
+        .btn {
+            padding: 22px 0;
+            background: #333;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.65em;
+            color: #fff;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.12s;
+        }
+        .btn:active, .btn:hover {
+            background: #61dafb;
+            color: #222;
+        }
+        .btn.operator {
+            background: #1c67be;
+        }
+        .btn.clear {
+            background: #d62236;
+        }
+        .btn.equal {
+            background: #37b24d;
+        }
+        #status {
+            color: #ffe082;
+            margin: 10px 0 0 0;
+            font-size: 1.1em;
+            min-height: 22px;
+        }
+        #history {
+            background: #232325;
+            border-radius: 8px;
+            padding: 8px 18px;
+            margin-top: 14px;
+            font-size: 1.03em;
+            color: #b5e8fc;
+            min-height: 38px;
+            word-break: break-word;
+        }
+        @media (max-width: 1200px) {
+            .section { min-width: 420px; max-width: 100vw; }
+            .button-grid { grid-template-columns: repeat(4, 75px);}
+            .video-section img { max-width: 335px; height: 335px;}
+        }
+        @media (max-width: 950px) {
+            .main-flex { flex-direction: column; align-items: center; gap: 22px;}
+            .section { min-width: 300px; max-width: 98vw;}
+        }
+        @media (max-width: 650px) {
+            .section { padding: 12px 3vw; }
+            .calc-display { font-size: 1.3em; padding: 16px 4vw;}
+            .button-grid { grid-template-columns: repeat(4, 1fr);}
+            .video-section img { max-width: 96vw; height: auto;}
+        }
+    </style>
+</head>
+<body>
+    <div class="main-flex">
+        <div class="section video-section">
+            <h2 style="color:#ffb900;font-size:1.7em;letter-spacing:1px;">Live Camera</h2>
+            <img id="videoFeed" src="{{ url_for('video_feed') }}" alt="Video Feed">
+        </div>
+        <div class="section calculator-section">
+            <h2 style="color:#69e6ffa6;margin:0 0 7px;">Calculator</h2>
+            <div id="calculator-display" class="calc-display">0</div>
+            <div class="button-grid">
+                {% for row in [['7','8','9','+'], ['4','5','6','-'], ['1','2','3','*'], ['C','0','=','/']] %}
+                    {% for key in row %}
+                        <button class="btn
+                            {% if key in ['+', '-', '*', '/'] %}operator{% endif %}
+                            {% if key == 'C' %}clear{% endif %}
+                            {% if key == '=' %}equal{% endif %}"
+                            onclick="manualClick('{{key}}')">
+                            {{key}}
+                        </button>
+                    {% endfor %}
+                {% endfor %}
+            </div>
+            <div id="history"></div>
+            <div id="status"></div>
+        </div>
+    </div>
+    <script>
+        function updateCalculatorState() {
+            fetch('/get_calculator_state')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('calculator-display').innerText = data.expression ?? '0';
+                    if (data.hover_button)
+                        document.getElementById('status').innerText = 'Hover: ' + data.hover_button +
+                            (data.gesture_detected ? " | Pinch detected!" : "");
+                    else if (data.gesture_detected)
+                        document.getElementById('status').innerText = "Pinch detected!";
+                    else
+                        document.getElementById('status').innerText = "";
+                    let historyDiv = document.getElementById('history');
+                    if (data.history && data.history.length) {
+                        historyDiv.innerHTML = data.history.map(h => `<div>${h}</div>`).join('');
+                    } else {
+                        historyDiv.innerHTML = '';
+                    }
+                });
+        }
+        setInterval(updateCalculatorState, 333);
+        function manualClick(value) {
+            fetch('/manual_click', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({'value': value})
+            })
+            .then(resp => resp.json())
+            .then(data => {
+                if(data.expression !== undefined) {
+                    document.getElementById('calculator-display').innerText = data.expression;
+                }
+            });
+        }
+    </script>
+</body>
+</html>
